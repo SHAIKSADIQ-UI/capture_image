@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Capture Image and Send to Admin</title>
+</head>
+<body>
+    <h1>Take a Picture</h1>
+
+    <!-- Video element to display camera feed -->
+    <video id="video" width="640" height="480" autoplay></video>
+
+    <!-- Button to take a picture -->
+    <button id="capture">Capture</button>
+
+    <!-- Canvas element to store captured image -->
+    <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+
+    <!-- Form to submit the picture -->
+    <form id="imageForm" action="your-server-endpoint" method="POST" enctype="multipart/form-data">
+        <input type="file" name="image" id="imageInput" style="display:none;">
+        <button type="submit">Send to Admin</button>
+    </form>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const captureButton = document.getElementById('capture');
+        const imageInput = document.getElementById('imageInput');
+        const imageForm = document.getElementById('imageForm');
+
+        // Access the camera
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then((stream) => {
+                video.srcObject = stream;
+            })
+            .catch((err) => {
+                console.error('Error accessing camera: ', err);
+            });
+
+        // Capture the image from the video stream and draw it on the canvas
+        captureButton.addEventListener('click', () => {
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Convert the canvas image to a data URL
+            const imageDataUrl = canvas.toDataURL('image/png');
+
+            // Convert the imageDataUrl to a Blob and append it to the form
+            fetch(imageDataUrl)
+                .then(res => res.blob())
+                .then(blob => {
+                    const file = new File([blob], 'captured-image.png', { type: 'image/png' });
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    imageInput.files = dataTransfer.files;
+                });
+        });
+
+        // Submit the form with the captured image
+        imageForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const formData = new FormData(imageForm);
+
+            // You can use fetch or XMLHttpRequest to send the form data to your server
+            fetch(imageForm.action, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert('Image sent to admin successfully!');
+            })
+            .catch(error => {
+                console.error('Error sending image: ', error);
+            });
+        });
+    </script>
+</body>
+</html>
