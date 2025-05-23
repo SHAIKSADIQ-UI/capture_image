@@ -87,5 +87,4 @@ OpenCV Errors: Ensure opencv4nodejs is installed (npm install opencv4nodejs).
 Server Not Connected: Verify server.js is running at http://localhost:3000.
 Webcam Issues: Grant webcam permissions or try a different browser.
 
-License
-MIT License
+
