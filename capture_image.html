@@ -1,81 +1,177 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Capture Image and Send to Admin</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CaptureImage - Computer Vision with Real-Time UI</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/babel-standalone@7.18.13/babel.min.js"></script>
+  <style>
+    /* Tailwind CSS compiled output (subset for this app) */
+    .bg-gray-100 { background-color: #f7fafc; }
+    .flex { display: flex; }
+    .flex-col { flex-direction: column; }
+    .items-center { align-items: center; }
+    .p-4 { padding: 1rem; }
+    .max-w-4xl { max-width: 56rem; }
+    .mx-auto { margin-left: auto; margin-right: auto; }
+    .text-center { text-align: center; }
+    .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+    .font-bold { font-weight: 700; }
+    .mb-4 { margin-bottom: 1rem; }
+    .text-blue-600 { color: #2563eb; }
+    .text-green-600 { color: #059669; }
+    .text-red-600 { color: #dc2626; }
+    .bg-red-100 { background-color: #fef2f2; }
+    .border { border-width: 1px; }
+    .border-red-400 { border-color: #f87171; }
+    .text-red-700 { color: #b91c1c; }
+    .px-4 { padding-left: 1rem; padding-right: 1rem; }
+    .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+    .rounded { border-radius: 0.25rem; }
+    .flex-1 { flex: 1 1 0%; }
+    .gap-4 { gap: 1rem; }
+    .md\\:flex-row { @media (min-width: 768px) { flex-direction: row; } }
+    .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+    .font-semibold { font-weight: 600; }
+    .mb-2 { margin-bottom: 0.5rem; }
+    .w-full { width: 100%; }
+    .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+    .text-gray-500 { color: #6b7280; }
+    .bg-blue-500 { background-color: #3b82f6; }
+    .hover\\:bg-blue-600:hover { background-color: #2563eb; }
+    .bg-gray-400 { background-color: #9ca3af; }
+    .cursor-not-allowed { cursor: not-allowed; }
+    .text-white { color: #ffffff; }
+    .hidden { display: none; }
+  </style>
 </head>
-<body>
-    <h1>Take a Picture</h1>
+<body class="bg-gray-100">
+  <div id="root" class="flex flex-col items-center p-4"></div>
 
-    <!-- Video element to display camera feed -->
-    <video id="video" width="640" height="480" autoplay></video>
+  <script type="text/babel">
+    const CaptureImageApp = () => {
+      const videoRef = React.useRef(null);
+      const canvasRef = React.useRef(null);
+      const [processedImage, setProcessedImage] = React.useState(null);
+      const [error, setError] = React.useState(null);
+      const [isLoading, setIsLoading] = React.useState(false);
+      const [isServerConnected, setIsServerConnected] = React.useState(false);
 
-    <!-- Button to take a picture -->
-    <button id="capture">Capture</button>
+      // Check server connection
+      React.useEffect(() => {
+        fetch('http://localhost:3000/health', {
+          method: 'GET'
+        })
+          .then(response => {
+            if (response.ok) setIsServerConnected(true);
+            else throw new Error('Server not reachable');
+          })
+          .catch(() => setError('Backend server not connected. Ensure server.js is running.'));
+      }, []);
 
-    <!-- Canvas element to store captured image -->
-    <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+      // Initialize webcam
+      React.useEffect(() => {
+        const startWebcam = async () => {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            videoRef.current.srcObject = stream;
+            videoRef.current.play();
+          } catch (err) {
+            setError('Failed to access webcam: ' + err.message);
+          }
+        };
+        startWebcam();
+      }, []);
 
-    <!-- Form to submit the picture -->
-    <form id="imageForm" action="your-server-endpoint" method="POST" enctype="multipart/form-data">
-        <input type="file" name="image" id="imageInput" style="display:none;">
-        <button type="submit">Send to Admin</button>
-    </form>
+      // Capture and process image
+      const captureAndProcess = async () => {
+        if (!isServerConnected) {
+          setError('Cannot process image: Backend server not connected.');
+          return;
+        }
 
-    <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const captureButton = document.getElementById('capture');
-        const imageInput = document.getElementById('imageInput');
-        const imageForm = document.getElementById('imageForm');
+        setIsLoading(true);
+        setError(null);
+        const canvas = canvasRef.current;
+        const video = videoRef.current;
+        if (!canvas || !video) {
+          setError('Video or canvas not available');
+          setIsLoading(false);
+          return;
+        }
 
-        // Access the camera
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then((stream) => {
-                video.srcObject = stream;
-            })
-            .catch((err) => {
-                console.error('Error accessing camera: ', err);
-            });
+        const context = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Capture the image from the video stream and draw it on the canvas
-        captureButton.addEventListener('click', () => {
-            const context = canvas.getContext('2d');
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // Get image data and send to backend
+        const imageData = canvas.toDataURL('image/jpeg');
+        try {
+          const response = await fetch('http://localhost:3000/process-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: imageData })
+          });
+          const data = await response.json();
+          if (data.processedImage) {
+            setProcessedImage(data.processedImage);
+          } else {
+            setError(data.error || 'Image processing failed');
+          }
+        } catch (err) {
+          setError('Error processing image: ' + err.message);
+        } finally {
+          setIsLoading(false);
+        }
+      };
 
-            // Convert the canvas image to a data URL
-            const imageDataUrl = canvas.toDataURL('image/png');
+      // Dismiss error message
+      const dismissError = () => setError(null);
 
-            // Convert the imageDataUrl to a Blob and append it to the form
-            fetch(imageDataUrl)
-                .then(res => res.blob())
-                .then(blob => {
-                    const file = new File([blob], 'captured-image.png', { type: 'image/png' });
-                    const dataTransfer = new DataTransfer();
-                    dataTransfer.items.add(file);
-                    imageInput.files = dataTransfer.files;
-                });
-        });
+      return (
+        <div className="max-w-4xl mx-auto text-center">
+          <h1 className="text-3xl font-bold mb-4 text-blue-600">CaptureImage - Computer Vision</h1>
+          <p className={`mb-4 ${isServerConnected ? 'text-green-600' : 'text-red-600'}`}>
+            {isServerConnected ? 'Connected to backend server' : 'Backend server not connected'}
+          </p>
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-4 flex justify-between items-center">
+              <span>{error}</span>
+              <button onClick={dismissError} className="text-red-700 font-bold">×</button>
+            </div>
+          )}
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <h2 className="text-xl font-semibold mb-2">Live Webcam Feed</h2>
+              <video ref={videoRef} className="w-full rounded shadow-md" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl font-semibold mb-2">Processed Image</h2>
+              {processedImage ? (
+                <img src={processedImage} alt="Processed" className="w-full rounded shadow-md" />
+              ) : (
+                <p className="text-gray-500">No image processed yet</p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={captureAndProcess}
+            disabled={isLoading || !isServerConnected}
+            className={`mt-4 px-6 py-2 rounded text-white ${
+              isLoading || !isServerConnected ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'
+            }`}
+          >
+            {isLoading ? 'Processing...' : 'Capture & Process'}
+          </button>
+          <canvas ref={canvasRef} className="hidden" />
+        </div>
+      );
+    };
 
-        // Submit the form with the captured image
-        imageForm.addEventListener('submit', (event) => {
-            event.preventDefault();
-            const formData = new FormData(imageForm);
-
-            // You can use fetch or XMLHttpRequest to send the form data to your server
-            fetch(imageForm.action, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                alert('Image sent to admin successfully!');
-            })
-            .catch(error => {
-                console.error('Error sending image: ', error);
-            });
-        });
-    </script>
+    ReactDOM.render(<CaptureImageApp />, document.getElementById('root'));
+  </script>
 </body>
 </html>
